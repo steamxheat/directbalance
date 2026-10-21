@@ -60,10 +60,8 @@ def get_balance(token, login):
         DIRECT_API_URL,
         {
             "method": "AccountManagement",
-            "param": {
-                "Action": "Get",
-                "SelectionCriteria": {"Logins": [login]},
-            },
+            # eLama accounts return their own shared balance only without SelectionCriteria.
+            "param": {"Action": "Get"},
             "locale": "ru",
             "token": token,
         },
