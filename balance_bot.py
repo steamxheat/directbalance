@@ -2,15 +2,17 @@
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
 
 
 DIRECT_API_URL = "https://api.direct.yandex.ru/live/v4/json/"
+DIRECT_REPORTS_URL = "https://api.direct.yandex.com/json/v501/reports"
 TELEGRAM_API_URL = "https://api.telegram.org"
 
 
@@ -73,9 +75,84 @@ def get_balance(token, login):
     return parse_balance(response, login)
 
 
+def parse_daily_spend(report, days):
+    total = Decimal("0")
+    for line in report.splitlines():
+        columns = line.split("\t")
+        if len(columns) != 2 or columns[1] in {"", "--"}:
+            continue
+        try:
+            total += Decimal(columns[1])
+        except InvalidOperation as error:
+            raise RuntimeError("Direct API вернул некорректный расход") from error
+    return total / days
+
+
+def get_average_daily_spend(token, login, days=7):
+    today = datetime.now(ZoneInfo("Europe/Moscow")).date()
+    date_to = today - timedelta(days=1)
+    date_from = date_to - timedelta(days=days - 1)
+    payload = {
+        "params": {
+            "SelectionCriteria": {
+                "DateFrom": date_from.isoformat(),
+                "DateTo": date_to.isoformat(),
+            },
+            "FieldNames": ["Date", "Cost"],
+            "ReportName": "Direct balance forecast",
+            "ReportType": "ACCOUNT_PERFORMANCE_REPORT",
+            "DateRangeType": "CUSTOM_DATE",
+            "Format": "TSV",
+            "IncludeVAT": "YES",
+            "IncludeDiscount": "YES",
+        }
+    }
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept-Language": "ru",
+        "Client-Login": login,
+        "returnMoneyInMicros": "false",
+        "skipReportHeader": "true",
+        "skipColumnHeader": "true",
+        "skipReportSummary": "true",
+        "processingMode": "online",
+    }
+
+    request = urllib.request.Request(
+        DIRECT_REPORTS_URL,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json; charset=utf-8", **headers},
+        method="POST",
+    )
+    for _ in range(6):
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return parse_daily_spend(response.read().decode("utf-8"), days)
+        except urllib.error.HTTPError as error:
+            if error.code not in {201, 202}:
+                detail = error.read().decode("utf-8", errors="replace")
+                raise RuntimeError(f"Direct Reports HTTP {error.code}: {detail}") from error
+            time.sleep(min(int(error.headers.get("retryIn", "5")), 30))
+    raise RuntimeError("Direct Reports не успел сформировать отчёт")
+
+
 def format_money(amount, currency):
     value = f"{amount.quantize(Decimal('0.01')):,.2f}".replace(",", " ")
     return f"{value} ₽" if currency in {"RUB", "RUR"} else f"{value} {currency}"
+
+
+def format_forecast(amount, daily_spend, now):
+    if amount <= 0:
+        return "Баланс уже исчерпан."
+    if daily_spend <= 0:
+        return "За последние 7 полных дней расхода не было — прогноз пока невозможен."
+
+    days_left = amount / daily_spend
+    end_at = now + timedelta(days=float(days_left))
+    return (
+        f"Средний расход: {format_money(daily_spend, 'RUB')} в сутки (7 дней)\n"
+        f"Прогноз: примерно на {days_left:.1f} дня, до {end_at:%d.%m.%Y}"
+    )
 
 
 def send_telegram(bot_token, chat_id, text):
@@ -102,11 +179,13 @@ def main():
 
     try:
         amount, currency = get_balance(direct_token, login)
-        checked_at = datetime.now(ZoneInfo("Europe/Moscow")).strftime("%d.%m.%Y в %H:%M")
+        daily_spend = get_average_daily_spend(direct_token, login)
+        now = datetime.now(ZoneInfo("Europe/Moscow"))
         text = (
             f"Баланс Яндекс Директа: {format_money(amount, currency)}\n"
+            f"{format_forecast(amount, daily_spend, now)}\n"
             f"Аккаунт: {login}\n"
-            f"Проверено: {checked_at} МСК"
+            f"Проверено: {now:%d.%m.%Y в %H:%M} МСК"
         )
     except Exception as error:
         text = f"Не удалось проверить баланс Яндекс Директа ({login}): {error}"
