@@ -15,6 +15,11 @@ DIRECT_API_URL = "https://api.direct.yandex.ru/live/v4/json/"
 DIRECT_REPORTS_URL = "https://api.direct.yandex.com/json/v501/reports"
 TELEGRAM_API_URL = "https://api.telegram.org"
 
+# urllib otherwise may initialise its default opener before systemd supplies proxy variables.
+urllib.request.install_opener(
+    urllib.request.build_opener(urllib.request.ProxyHandler(urllib.request.getproxies()))
+)
+
 
 def post_json(url, payload, headers=None):
     request = urllib.request.Request(
