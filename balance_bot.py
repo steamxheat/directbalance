@@ -14,11 +14,24 @@ from zoneinfo import ZoneInfo
 DIRECT_API_URL = "https://api.direct.yandex.ru/live/v4/json/"
 DIRECT_REPORTS_URL = "https://api.direct.yandex.com/json/v501/reports"
 TELEGRAM_API_URL = "https://api.telegram.org"
+REQUEST_ATTEMPTS = 3
 
 # urllib otherwise may initialise its default opener before systemd supplies proxy variables.
 urllib.request.install_opener(
     urllib.request.build_opener(urllib.request.ProxyHandler(urllib.request.getproxies()))
 )
+
+
+def open_with_retry(request):
+    for attempt in range(REQUEST_ATTEMPTS):
+        try:
+            return urllib.request.urlopen(request, timeout=30)
+        except urllib.error.HTTPError:
+            raise
+        except (TimeoutError, urllib.error.URLError):
+            if attempt == REQUEST_ATTEMPTS - 1:
+                raise
+            time.sleep(5)
 
 
 def post_json(url, payload, headers=None):
@@ -29,7 +42,7 @@ def post_json(url, payload, headers=None):
         method="POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with open_with_retry(request) as response:
             return json.load(response)
     except urllib.error.HTTPError as error:
         try:
@@ -127,15 +140,19 @@ def get_average_daily_spend(token, login, days=7):
         headers={"Content-Type": "application/json; charset=utf-8", **headers},
         method="POST",
     )
-    for _ in range(6):
+    for attempt in range(6):
         try:
-            with urllib.request.urlopen(request, timeout=30) as response:
+            with open_with_retry(request) as response:
                 return parse_daily_spend(response.read().decode("utf-8"), days)
         except urllib.error.HTTPError as error:
-            if error.code not in {201, 202}:
+            if 500 <= error.code < 600 and attempt < 5:
+                error.close()
+                time.sleep(5)
+            elif error.code not in {201, 202}:
                 detail = error.read().decode("utf-8", errors="replace")
                 raise RuntimeError(f"Direct Reports HTTP {error.code}: {detail}") from error
-            time.sleep(min(int(error.headers.get("retryIn", "5")), 30))
+            else:
+                time.sleep(min(int(error.headers.get("retryIn", "5")), 30))
     raise RuntimeError("Direct Reports не успел сформировать отчёт")
 
 
