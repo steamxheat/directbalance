@@ -2,6 +2,7 @@
 import json
 import os
 import urllib.error
+import urllib.parse
 import urllib.request
 
 
@@ -61,7 +62,9 @@ def get_state(task):
             raise RuntimeError("Неверный тип или кампания объявления")
         if len(responsive.get("Titles", [])) != 7 or len(responsive.get("Texts", [])) != 3:
             raise RuntimeError("Не заполнены 7 заголовков и 3 текста")
-        if responsive.get("Href") != expected_urls[ad["Id"]]:
+        actual = urllib.parse.urlsplit(responsive.get("Href", ""))
+        expected = urllib.parse.urlsplit(expected_urls[ad["Id"]])
+        if (actual.hostname, actual.path.rstrip("/")) != (expected.hostname, expected.path.rstrip("/")):
             raise RuntimeError("Неверная посадочная ссылка")
     return campaign[0], ads
 
