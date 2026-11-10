@@ -56,8 +56,8 @@ def get_state(task):
         raise RuntimeError("Набор объявлений не совпал")
     expected_urls = {ad_id: task["home"] for ad_id in task["ad_ids"]}
     expected_urls[task["profile_ad_id"]] = task["profile"]
-    mismatches = []
-    for index, ad in enumerate(ads, 1):
+    mismatches = set()
+    for ad in ads:
         responsive = ad.get("ResponsiveAd") or {}
         if ad["CampaignId"] != task["campaign_id"] or ad["Type"] != "RESPONSIVE_AD":
             raise RuntimeError("Неверный тип или кампания объявления")
@@ -66,10 +66,8 @@ def get_state(task):
         actual = urllib.parse.urlsplit(responsive.get("Href", ""))
         expected = urllib.parse.urlsplit(expected_urls[ad["Id"]])
         if (actual.hostname, actual.path.rstrip("/")) != (expected.hostname, expected.path.rstrip("/")):
-            mismatches.append({"ad": index, "actual": f"{actual.hostname}{actual.path}"})
-    if mismatches:
-        raise RuntimeError(f"Неверные посадочные ссылки: {json.dumps(mismatches, ensure_ascii=False)}")
-    return campaign[0], ads
+            mismatches.add(ad["Id"])
+    return campaign[0], ads, mismatches
 
 
 def texts(ad):
@@ -83,7 +81,7 @@ def action_errors(result, key):
 
 def main():
     task = json.loads(os.environ["DIRECT_TASK_JSON"])
-    campaign, ads = get_state(task)
+    campaign, ads, url_mismatches = get_state(task)
     uppercase_count = sum(value.count("КОРДА") for ad in ads for value in sum(texts(ad), []))
     print(
         json.dumps(
@@ -95,7 +93,8 @@ def main():
                 "payment_status": campaign["StatusPayment"],
                 "ads": len(ads),
                 "all_ads_complete": True,
-                "landing_urls_ok": True,
+                "landing_urls_ok": not url_mismatches,
+                "landing_url_mismatches": len(url_mismatches),
                 "uppercase_brand_occurrences": uppercase_count,
                 "name_matches": campaign["Name"] == task["name"],
             },
@@ -110,15 +109,13 @@ def main():
     updates = []
     for ad in ads:
         titles, ad_texts = texts(ad)
-        updates.append(
-            {
-                "Id": ad["Id"],
-                "ResponsiveAd": {
-                    "Titles": [value.replace("КОРДА", "Корда") for value in titles],
-                    "Texts": [value.replace("КОРДА", "Корда") for value in ad_texts],
-                },
-            }
-        )
+        responsive = {
+            "Titles": [value.replace("КОРДА", "Корда") for value in titles],
+            "Texts": [value.replace("КОРДА", "Корда") for value in ad_texts],
+        }
+        if ad["Id"] in url_mismatches:
+            responsive["Href"] = task["profile"] if ad["Id"] == task["profile_ad_id"] else task["home"]
+        updates.append({"Id": ad["Id"], "ResponsiveAd": responsive})
     errors = action_errors(call("ads", "update", {"Ads": updates}), "UpdateResults")
     errors += action_errors(
         call("campaigns", "update", {"Campaigns": [{"Id": task["campaign_id"], "Name": task["name"]}]}),
@@ -127,8 +124,10 @@ def main():
     if errors:
         raise RuntimeError(f"Ошибки обновления: {len(errors)}")
 
-    campaign, ads = get_state(task)
-    if campaign["Name"] != task["name"] or any("КОРДА" in value for ad in ads for value in sum(texts(ad), [])):
+    campaign, ads, url_mismatches = get_state(task)
+    if campaign["Name"] != task["name"] or url_mismatches or any(
+        "КОРДА" in value for ad in ads for value in sum(texts(ad), [])
+    ):
         raise RuntimeError("Проверка после обновления не пройдена")
 
     draft_ids = [ad["Id"] for ad in ads if ad["Status"] == "DRAFT"]
