@@ -56,7 +56,8 @@ def get_state(task):
         raise RuntimeError("Набор объявлений не совпал")
     expected_urls = {ad_id: task["home"] for ad_id in task["ad_ids"]}
     expected_urls[task["profile_ad_id"]] = task["profile"]
-    for ad in ads:
+    mismatches = []
+    for index, ad in enumerate(ads, 1):
         responsive = ad.get("ResponsiveAd") or {}
         if ad["CampaignId"] != task["campaign_id"] or ad["Type"] != "RESPONSIVE_AD":
             raise RuntimeError("Неверный тип или кампания объявления")
@@ -65,7 +66,9 @@ def get_state(task):
         actual = urllib.parse.urlsplit(responsive.get("Href", ""))
         expected = urllib.parse.urlsplit(expected_urls[ad["Id"]])
         if (actual.hostname, actual.path.rstrip("/")) != (expected.hostname, expected.path.rstrip("/")):
-            raise RuntimeError("Неверная посадочная ссылка")
+            mismatches.append({"ad": index, "actual": f"{actual.hostname}{actual.path}"})
+    if mismatches:
+        raise RuntimeError(f"Неверные посадочные ссылки: {json.dumps(mismatches, ensure_ascii=False)}")
     return campaign[0], ads
 
 
