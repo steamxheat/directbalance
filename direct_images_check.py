@@ -44,6 +44,7 @@ ads = call(
         "ResponsiveAdFieldNames": ["AdImages"],
     },
 )["Ads"]
+print(json.dumps({"raw_slots": [ad["ResponsiveAd"].get("AdImages") for ad in ads]}, ensure_ascii=False))
 hashes = [
     image["AdImageHash"]
     for ad in ads
