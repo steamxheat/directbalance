@@ -45,9 +45,9 @@ ads = call(
     },
 )["Ads"]
 hashes = [
-    image_hash
+    image["AdImageHash"]
     for ad in ads
-    for image_hash in (ad["ResponsiveAd"].get("AdImages") or {}).get("Items", [])
+    for image in (ad["ResponsiveAd"].get("AdImages") or {}).get("Items", [])
 ]
 images = call(
     "adimages",
@@ -60,12 +60,12 @@ images = call(
 by_hash = {image["AdImageHash"]: image for image in images}
 result = []
 for ad in sorted(ads, key=lambda item: item["Id"]):
-    ad_hashes = (ad["ResponsiveAd"].get("AdImages") or {}).get("Items", [])
+    ad_slots = (ad["ResponsiveAd"].get("AdImages") or {}).get("Items", [])
     result.append({
         "ad_id": ad["Id"],
         "status": ad["Status"],
         "state": ad["State"],
-        "images": [by_hash[image_hash] for image_hash in ad_hashes],
+        "images": [{**by_hash[slot["AdImageHash"]], "Moderation": slot.get("AdImageModeration")} for slot in ad_slots],
     })
 if len(result) != 6 or len(hashes) != 6 or len(images) != 6:
     raise RuntimeError("Не найдены шесть объявлений с шестью изображениями")
