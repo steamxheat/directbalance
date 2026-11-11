@@ -131,7 +131,6 @@ def verify(items):
             "status": item["Status"],
             "state": item["State"],
             "images": len(images),
-            "image_moderation": [image.get("AdImageModeration", {}).get("Status") for image in images],
         })
     return result
 
