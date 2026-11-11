@@ -1,0 +1,25 @@
+name: Direct images one-off task
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: inspect or apply
+        required: true
+        default: inspect
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install --disable-pip-version-check Pillow==11.3.0
+      - run: python direct_images_task.py
+        env:
+          YANDEX_DIRECT_TOKEN: ${{ secrets.YANDEX_DIRECT_TOKEN }}
+          YANDEX_DIRECT_LOGIN: e-20086596
+          DIRECT_IMAGES_MODE: ${{ inputs.mode }}
