@@ -44,9 +44,8 @@ ads = call(
         "ResponsiveAdFieldNames": ["AdImages"],
     },
 )["Ads"]
-print(json.dumps({"raw_slots": [ad["ResponsiveAd"].get("AdImages") for ad in ads]}, ensure_ascii=False))
 hashes = [
-    image["AdImageHash"]
+    image["ImageHash"]
     for ad in ads
     for image in (ad["ResponsiveAd"].get("AdImages") or {}).get("Items", [])
 ]
@@ -66,7 +65,7 @@ for ad in sorted(ads, key=lambda item: item["Id"]):
         "ad_id": ad["Id"],
         "status": ad["Status"],
         "state": ad["State"],
-        "images": [{**by_hash[slot["AdImageHash"]], "Moderation": slot.get("AdImageModeration")} for slot in ad_slots],
+        "images": [{**by_hash[slot["ImageHash"]], "SlotStatus": slot.get("Status"), "SlotUrl": slot.get("ImageUrl")} for slot in ad_slots],
     })
 if len(result) != 6 or len(hashes) != 6 or len(images) != 6:
     raise RuntimeError("Не найдены шесть объявлений с шестью изображениями")
