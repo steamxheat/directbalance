@@ -44,7 +44,11 @@ ads = call(
         "ResponsiveAdFieldNames": ["AdImages"],
     },
 )["Ads"]
-hashes = [image_hash for ad in ads for image_hash in ad["ResponsiveAd"].get("AdImages", [])]
+hashes = [
+    image_hash
+    for ad in ads
+    for image_hash in (ad["ResponsiveAd"].get("AdImages") or {}).get("Items", [])
+]
 images = call(
     "adimages",
     "get",
@@ -56,7 +60,7 @@ images = call(
 by_hash = {image["AdImageHash"]: image for image in images}
 result = []
 for ad in sorted(ads, key=lambda item: item["Id"]):
-    ad_hashes = ad["ResponsiveAd"].get("AdImages", [])
+    ad_hashes = (ad["ResponsiveAd"].get("AdImages") or {}).get("Items", [])
     result.append({
         "ad_id": ad["Id"],
         "status": ad["Status"],
