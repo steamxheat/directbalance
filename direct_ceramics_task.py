@@ -216,7 +216,6 @@ def main():
                             "Texts": TEXTS,
                             "Href": LANDING,
                             "SitelinkSetId": sitelink_id,
-                            "CalloutSetting": {"AdExtensions": [{"AdExtensionId": item_id, "Operation": "SET"} for item_id in callout_ids]},
                             "BusinessId": template["BusinessId"],
                         },
                     }]
@@ -224,6 +223,14 @@ def main():
             ),
             "AddResults",
         )[0]
+        result_ids(
+            call(
+                "ads",
+                "update",
+                {"Ads": [{"Id": ad_id, "ResponsiveAd": {"CalloutSetting": {"AdExtensions": [{"AdExtensionId": item_id, "Operation": "SET"} for item_id in callout_ids]}}}]},
+            ),
+            "UpdateResults",
+        )
         result_ids(call("ads", "moderate", {"SelectionCriteria": {"Ids": [ad_id]}}), "ModerateResults")
     elif len(group_ads) > 1:
         raise RuntimeError("В новой группе уже несколько объявлений")
