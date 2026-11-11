@@ -146,7 +146,7 @@ def main():
         raise RuntimeError("Неизвестный режим")
     hashes = upload_images()
     updates = [
-        {"Id": ad_id, "ResponsiveAd": {"AdImageHashes": [hashes[ad_id]]}}
+        {"Id": ad_id, "ResponsiveAd": {"AdImageHashes": {"Items": [hashes[ad_id]]}}}
         for ad_id in ADS
     ]
     check_results(call("ads", "update", {"Ads": updates}), "UpdateResults")
