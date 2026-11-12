@@ -90,7 +90,7 @@ assert len(campaigns) == 1 and campaigns[0]["Id"] == CAMPAIGN_ID
 
 groups = call("adgroups", {
     "SelectionCriteria": {"CampaignIds": [CAMPAIGN_ID]},
-    "FieldNames": ["Id", "Name", "Status", "State", "ServingStatus"],
+    "FieldNames": ["Id", "Name", "Status", "ServingStatus"],
 })["AdGroups"]
 
 keywords = call("keywords", {
