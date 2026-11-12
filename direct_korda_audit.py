@@ -103,20 +103,28 @@ ads = call("ads", {
     "FieldNames": ["Id", "CampaignId", "AdGroupId", "Type", "State", "Status", "StatusClarification"],
 })["Ads"]
 
-print(json.dumps({
-    "period": [START_DATE, date.today().isoformat()],
-    "campaign": campaigns[0],
-    "groups": groups,
-    "keywords": keywords,
-    "ads": ads,
-    "campaign_stats": report("CAMPAIGN_PERFORMANCE_REPORT", [
-        "CampaignId", "CampaignName", "Impressions", "Clicks", "Cost", "Ctr", "AvgCpc",
-    ]),
-    "group_stats": report("ADGROUP_PERFORMANCE_REPORT", [
-        "CampaignId", "AdGroupId", "AdGroupName", "Impressions", "Clicks", "Cost", "Ctr", "AvgCpc",
-    ]),
-    "search_queries": report("SEARCH_QUERY_PERFORMANCE_REPORT", [
-        "CampaignId", "AdGroupId", "AdGroupName", "Query", "Criterion", "MatchType",
-        "Impressions", "Clicks", "Cost", "Ctr", "AvgCpc",
-    ]),
-}, ensure_ascii=False))
+def emit(label, value):
+    print(f"AUDIT_{label}\t{json.dumps(value, ensure_ascii=False)}")
+
+
+emit("PERIOD", [START_DATE, date.today().isoformat()])
+emit("CAMPAIGN", campaigns[0])
+for group in groups:
+    emit("GROUP", group)
+for ad in ads:
+    emit("AD", ad)
+for keyword in keywords:
+    emit("KEYWORD", keyword)
+for row in report("CAMPAIGN_PERFORMANCE_REPORT", [
+    "CampaignId", "CampaignName", "Impressions", "Clicks", "Cost", "Ctr", "AvgCpc",
+]):
+    emit("CAMPAIGN_STATS", row)
+for row in report("ADGROUP_PERFORMANCE_REPORT", [
+    "CampaignId", "AdGroupId", "AdGroupName", "Impressions", "Clicks", "Cost", "Ctr", "AvgCpc",
+]):
+    emit("GROUP_STATS", row)
+for row in report("SEARCH_QUERY_PERFORMANCE_REPORT", [
+    "CampaignId", "AdGroupId", "AdGroupName", "Query", "Criterion", "MatchType",
+    "Impressions", "Clicks", "Cost", "Ctr", "AvgCpc",
+]):
+    emit("SEARCH_QUERY", row)
