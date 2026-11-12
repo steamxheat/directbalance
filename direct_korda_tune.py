@@ -54,7 +54,9 @@ result = call("keywords", "suspend", {"SelectionCriteria": {"Ids": active_ids}})
 
 after = read_targets()
 assert len(after) == len(TARGETS)
-assert all(item["State"] == "SUSPENDED" and item["Status"] == "ACCEPTED" for item in after)
+print(json.dumps({"before": before, "result": result, "after": after}, ensure_ascii=False))
+if not all(item["State"] == "SUSPENDED" and item["Status"] == "ACCEPTED" for item in after):
+    raise RuntimeError("autotargeting readback did not confirm suspension")
 
 campaign = call("campaigns", "get", {
     "SelectionCriteria": {"Ids": [CAMPAIGN_ID]},
@@ -62,4 +64,4 @@ campaign = call("campaigns", "get", {
 })["Campaigns"][0]
 assert campaign == {"Id": CAMPAIGN_ID, "Status": "ACCEPTED", "State": "ON", "StatusPayment": "ALLOWED"}
 
-print(json.dumps({"before": before, "result": result, "after": after, "campaign": campaign}, ensure_ascii=False))
+print(json.dumps({"campaign": campaign}, ensure_ascii=False))
