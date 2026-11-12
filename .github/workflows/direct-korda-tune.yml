@@ -1,4 +1,4 @@
-name: Direct Korda suspend noisy autotargeting
+name: Direct Korda restrict noisy autotargeting
 
 on: workflow_dispatch
 

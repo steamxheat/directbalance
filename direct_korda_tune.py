@@ -37,6 +37,7 @@ def read_targets():
     return call("keywords", "get", {
         "SelectionCriteria": {"Ids": list(TARGETS)},
         "FieldNames": ["Id", "Keyword", "CampaignId", "AdGroupId", "State", "Status"],
+        "AutotargetingSettingsCategoriesFieldNames": ["Exact", "Narrow", "Alternative", "Accessory", "Broader"],
     })["Keywords"]
 
 
@@ -46,17 +47,21 @@ for item in before:
     assert item["CampaignId"] == CAMPAIGN_ID
     assert item["AdGroupId"] == TARGETS[item["Id"]]
     assert item["Keyword"] == "---autotargeting"
-    assert item["State"] in ("ON", "SUSPENDED")
+    assert item["State"] == "ON"
     assert item["Status"] == "ACCEPTED"
 
-active_ids = [item["Id"] for item in before if item["State"] == "ON"]
-result = call("keywords", "suspend", {"SelectionCriteria": {"Ids": active_ids}}) if active_ids else {"SuspendResults": []}
+categories = {"Exact": "YES", "Narrow": "NO", "Alternative": "NO", "Accessory": "NO", "Broader": "NO"}
+result = call("keywords", "update", {"Keywords": [
+    {"Id": item["Id"], "AutotargetingSettings": {"Categories": categories}}
+    for item in before
+]})
+assert all(item.get("Id") in TARGETS and not item.get("Errors") for item in result["UpdateResults"])
 
 after = read_targets()
 assert len(after) == len(TARGETS)
 print(json.dumps({"before": before, "result": result, "after": after}, ensure_ascii=False))
-if not all(item["State"] == "SUSPENDED" and item["Status"] == "ACCEPTED" for item in after):
-    raise RuntimeError("autotargeting readback did not confirm suspension")
+if not all(item["AutotargetingSettings"]["Categories"] == categories for item in after):
+    raise RuntimeError("autotargeting readback did not confirm target-only categories")
 
 campaign = call("campaigns", "get", {
     "SelectionCriteria": {"Ids": [CAMPAIGN_ID]},
