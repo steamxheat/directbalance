@@ -46,11 +46,11 @@ for item in before:
     assert item["CampaignId"] == CAMPAIGN_ID
     assert item["AdGroupId"] == TARGETS[item["Id"]]
     assert item["Keyword"] == "---autotargeting"
-    assert item["State"] == "ON"
+    assert item["State"] in ("ON", "SUSPENDED")
     assert item["Status"] == "ACCEPTED"
 
-result = call("keywords", "suspend", {"SelectionCriteria": {"Ids": list(TARGETS)}})
-assert all(item.get("Id") in TARGETS and not item.get("Errors") for item in result["SuspendResults"])
+active_ids = [item["Id"] for item in before if item["State"] == "ON"]
+result = call("keywords", "suspend", {"SelectionCriteria": {"Ids": active_ids}}) if active_ids else {"SuspendResults": []}
 
 after = read_targets()
 assert len(after) == len(TARGETS)
