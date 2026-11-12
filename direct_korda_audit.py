@@ -54,7 +54,7 @@ def report(report_type, fields):
                 "Filter": [{"Field": "CampaignId", "Operator": "IN", "Values": [str(CAMPAIGN_ID)]}],
             },
             "FieldNames": fields,
-            "Page": {"Limit": 1000},
+            "Page": {"Limit": 100000},
             "ReportName": name,
             "ReportType": report_type,
             "DateRangeType": "CUSTOM_DATE",
