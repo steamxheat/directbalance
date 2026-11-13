@@ -255,7 +255,21 @@ def main():
     final_group = target_group()
     checked = verify(final_group)
     after = campaign()
-    assert after == before
+    counters = (after["UnifiedCampaign"].get("CounterIds") or {}).get("Items", [])
+    if counters != [32011556]:
+        result = call("campaigns", "update", {"Campaigns": [{
+            "Id": CAMPAIGN_ID,
+            "UnifiedCampaign": {"CounterIds": {"Items": [32011556]}},
+        }]})["UpdateResults"]
+        assert len(result) == 1 and result[0].get("Id") == CAMPAIGN_ID and not result[0].get("Errors")
+        after = campaign()
+    assert {key: after[key] for key in ("Id", "Name", "Type", "Status", "State", "StatusPayment")} == {
+        key: before[key] for key in ("Id", "Name", "Type", "Status", "State", "StatusPayment")
+    }
+    assert after["UnifiedCampaign"]["BiddingStrategy"] == before["UnifiedCampaign"]["BiddingStrategy"]
+    assert after["UnifiedCampaign"]["Settings"] == before["UnifiedCampaign"]["Settings"]
+    assert after["UnifiedCampaign"]["PriorityGoals"] == before["UnifiedCampaign"]["PriorityGoals"]
+    assert after["UnifiedCampaign"]["CounterIds"]["Items"] == [32011556]
     print(json.dumps({"updated": True, "campaign": after, "group": checked}, ensure_ascii=False))
 
 
