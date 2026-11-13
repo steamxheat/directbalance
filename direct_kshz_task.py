@@ -241,11 +241,13 @@ def main():
                 "Texts": TEXTS,
                 "Href": LANDING,
                 "SitelinkSetId": sitelink_id,
-                "CalloutSetting": {"AdExtensions": [{"AdExtensionId": item, "Operation": "SET"} for item in callout_ids]},
                 "BusinessId": business_id(),
             },
         }]}), "AddResults")[0]
-        ids(call("ads", "update", {"Ads": [{"Id": ad_id, "ResponsiveAd": {"AdImageHashes": {"Items": [image_hash]}}}]}), "UpdateResults")
+        ids(call("ads", "update", {"Ads": [{"Id": ad_id, "ResponsiveAd": {
+            "AdImageHashes": {"Items": [image_hash]},
+            "CalloutSetting": {"AdExtensions": [{"AdExtensionId": item, "Operation": "SET"} for item in callout_ids]},
+        }}]}), "UpdateResults")
         ids(call("ads", "moderate", {"SelectionCriteria": {"Ids": [ad_id]}}), "ModerateResults")
     elif len(ads) != 1:
         raise RuntimeError("В целевой группе уже несколько объявлений")
