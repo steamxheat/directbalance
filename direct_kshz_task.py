@@ -103,7 +103,7 @@ def group_ads(group_id):
         "SelectionCriteria": {"AdGroupIds": [group_id]},
         "FieldNames": ["Id", "CampaignId", "AdGroupId", "Type", "Status", "State", "StatusClarification"],
         "ResponsiveAdFieldNames": ["Titles", "Texts", "Href", "SitelinkSetId", "AdExtensions", "BusinessId", "AdImages"],
-    })["Ads"]
+    }).get("Ads", [])
 
 
 def group_keywords(group_id):
