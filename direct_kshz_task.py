@@ -37,7 +37,7 @@ assert len(campaigns) == 1
 
 groups = call("adgroups", "get", {
     "SelectionCriteria": {"CampaignIds": [CAMPAIGN_ID]},
-    "FieldNames": ["Id", "Name", "CampaignId", "Status", "State", "ServingStatus", "Type", "RegionIds"],
+    "FieldNames": ["Id", "Name", "CampaignId", "Status", "ServingStatus", "Type", "RegionIds", "NegativeKeywords"],
 })["AdGroups"]
 target_groups = [group for group in groups if any(word in group["Name"].lower() for word in ("шум", "кожух", "кабин", "кшз"))]
 target_ids = [group["Id"] for group in target_groups]
@@ -65,7 +65,7 @@ images = call("adimages", "get", {
 
 print(json.dumps({
     "campaign": campaigns[0],
-    "all_groups": [{"Id": item["Id"], "Name": item["Name"], "Status": item["Status"], "State": item["State"]} for item in groups],
+    "all_groups": [{"Id": item["Id"], "Name": item["Name"], "Status": item["Status"], "ServingStatus": item.get("ServingStatus")} for item in groups],
     "target_groups": target_groups,
     "ads": ads,
     "keywords": keywords,
