@@ -94,7 +94,7 @@ ads = call("ads", {
 })["result"]["Ads"]
 keywords = call("keywords", {
     "SelectionCriteria": {"CampaignIds": [CAMPAIGN_ID]},
-    "FieldNames": ["Id", "Keyword", "AdGroupId", "Status", "State", "ServingStatus", "AutotargetingSettings"],
+    "FieldNames": ["Id", "Keyword", "AdGroupId", "Status", "State", "ServingStatus"],
 })["result"]["Keywords"]
 
 summary = {"campaign": campaign, "groups": []}
@@ -105,7 +105,7 @@ for group in groups:
         **group,
         "ads": [{key: row.get(key) for key in ("Id", "Status", "State", "StatusClarification")} for row in group_ads],
         "keyword_states": {state: sum(row["State"] == state for row in group_keywords) for state in {row["State"] for row in group_keywords}},
-        "autotarget": [{key: row.get(key) for key in ("Id", "Status", "State", "ServingStatus", "AutotargetingSettings")} for row in group_keywords if row["Keyword"] == "---autotargeting"],
+        "autotarget": [{key: row.get(key) for key in ("Id", "Status", "State", "ServingStatus")} for row in group_keywords if row["Keyword"] == "---autotargeting"],
     })
 print("=== summary ===")
 print(json.dumps(summary, ensure_ascii=False, indent=2))
