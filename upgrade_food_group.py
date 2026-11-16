@@ -84,7 +84,7 @@ def ads(group_ids=None):
     return call("ads", "get", {
         "SelectionCriteria": criteria,
         "FieldNames": ["Id", "AdGroupId", "Type", "Status", "State", "StatusClarification"],
-        "TextAdFieldNames": ["Title", "Title2", "Text", "Href", "SitelinkSetId", "AdExtensions", "BusinessId", "AdImages"],
+        "TextAdFieldNames": ["Title", "Title2", "Text", "Href", "SitelinkSetId", "AdExtensions", "BusinessId", "AdImageHash"],
         "ResponsiveAdFieldNames": ["Titles", "Texts", "Href", "SitelinkSetId", "AdExtensions", "BusinessId", "AdImages"],
     }).get("Ads", [])
 
