@@ -30,7 +30,7 @@ queries = {
             "SelectionCriteria": {"Ids": [CAMPAIGN_ID]},
             "FieldNames": [
                 "Id", "Name", "Type", "Status", "State", "StatusPayment",
-                "ServingStatus", "StartDate", "EndDate", "DailyBudget",
+                "StartDate", "EndDate", "DailyBudget",
             ],
         },
     ),
@@ -40,9 +40,8 @@ queries = {
             "SelectionCriteria": {"CampaignIds": [CAMPAIGN_ID]},
             "FieldNames": [
                 "Id", "Name", "CampaignId", "RegionIds", "NegativeKeywords",
-                "TrackingParams", "Status", "Type", "Subtype",
+                "TrackingParams", "Status", "Type", "Subtype", "ServingStatus",
             ],
-            "TextAdGroupFieldNames": ["ServingStatus"],
         },
     ),
     "ads": (
@@ -55,8 +54,8 @@ queries = {
             ],
             "TextAdFieldNames": [
                 "Title", "Title2", "Text", "Href", "Mobile", "DisplayUrlPath",
-                "VCardId", "AdImageHash", "SitelinkSetId", "AdExtensionIds",
-                "VideoExtensionCreativeId", "TurboPageId", "BusinessId",
+                "VCardId", "AdImageHash", "SitelinkSetId", "AdExtensions",
+                "VideoExtension", "TurboPageId", "BusinessId", "TrackingParams",
             ],
         },
     ),
@@ -67,7 +66,7 @@ queries = {
             "FieldNames": [
                 "Id", "Keyword", "AdGroupId", "CampaignId", "Bid", "ContextBid",
                 "StrategyPriority", "UserParam1", "UserParam2", "Status", "State",
-                "ServingStatus", "Productivity", "Statistics",
+                "ServingStatus", "Productivity", "StatisticsSearch", "StatisticsNetwork",
             ],
         },
     ),
