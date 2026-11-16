@@ -55,7 +55,7 @@ queries = {
             "TextAdFieldNames": [
                 "Title", "Title2", "Text", "Href", "Mobile", "DisplayUrlPath",
                 "VCardId", "AdImageHash", "SitelinkSetId", "AdExtensions",
-                "VideoExtension", "TurboPageId", "BusinessId", "TrackingParams",
+                "VideoExtension", "TurboPageId", "BusinessId",
             ],
         },
     ),
