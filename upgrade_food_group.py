@@ -115,8 +115,6 @@ def verify():
     summary = {
         "campaign": current_campaign,
         "group": current_group,
-        "text_ads": [{key: item.get(key) for key in ("Id", "Status", "State", "StatusClarification")}
-                     for item in current_ads if item["Type"] == "TEXT_AD"],
         "responsive_ads": [],
         "keywords": {
             "regular": sum(item["Keyword"] != "---autotargeting" for item in current_keywords),
@@ -171,11 +169,14 @@ def main():
         raise RuntimeError("Old groups are not fully isolated")
 
     existing = responsive_ads()
-    if not existing:
-        text_ads = [item for item in ads() if item["Type"] == "TEXT_AD"]
-        if len(text_ads) != 3:
-            raise RuntimeError("Expected three existing text ads")
-        base = text_ads[0]["TextAd"]
+    full = [item for item in existing
+            if [part["Title"] for part in item["ResponsiveAd"].get("Titles", [])] == TITLES
+            and [part["Text"] for part in item["ResponsiveAd"].get("Texts", [])] == TEXTS]
+    if not full:
+        if len(existing) != 3:
+            raise RuntimeError("Expected three existing responsive ads")
+        target = min(existing, key=lambda item: item["Id"])
+        base = target["ResponsiveAd"]
         sitelink_id = base.get("SitelinkSetId")
         business_id = base.get("BusinessId")
         if not sitelink_id or not business_id:
@@ -190,30 +191,31 @@ def main():
             "ImageData": image_data,
             "Type": "REGULAR",
         }]}), "AddResults")[0]
-        ad_id = ids(call("ads", "add", {"Ads": [{
-            "AdGroupId": GROUP_ID,
+        ad_id = target["Id"]
+        ids(call("ads", "update", {"Ads": [{
+            "Id": ad_id,
             "ResponsiveAd": {
                 "Titles": TITLES,
                 "Texts": TEXTS,
                 "Href": LANDING + TRACKING,
                 "SitelinkSetId": sitelink_id,
                 "BusinessId": business_id,
+                "AdImageHashes": {"Items": [image_hash]},
+                "CalloutSetting": {"AdExtensions": [
+                    {"AdExtensionId": item, "Operation": "SET"} for item in callout_ids
+                ]},
             },
-        }]}), "AddResults")[0]
-        ids(call("ads", "update", {"Ads": [{"Id": ad_id, "ResponsiveAd": {
-            "AdImageHashes": {"Items": [image_hash]},
-            "CalloutSetting": {"AdExtensions": [
-                {"AdExtensionId": item, "Operation": "SET"} for item in callout_ids
-            ]},
-        }}]}), "UpdateResults")
+        }]}), "UpdateResults")
         ids(call("ads", "moderate", {"SelectionCriteria": {"Ids": [ad_id]}}), "ModerateResults")
-    elif len(existing) > 1:
-        raise RuntimeError("More than one responsive ad already exists")
 
     after = verify()
-    if len(after["responsive_ads"]) != 1:
-        raise RuntimeError("Responsive ad was not created")
-    responsive = after["responsive_ads"][0]
+    if len(after["responsive_ads"]) != 3:
+        raise RuntimeError("Unexpected number of responsive ads")
+    matching = [item for item in after["responsive_ads"]
+                if item["titles"] == TITLES and item["texts"] == TEXTS]
+    if len(matching) != 1:
+        raise RuntimeError("Full responsive ad was not created")
+    responsive = matching[0]
     assert responsive["titles"] == TITLES
     assert responsive["texts"] == TEXTS
     assert len(responsive["images"]) == 1
