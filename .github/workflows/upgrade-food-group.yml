@@ -1,0 +1,27 @@
+name: Upgrade food group
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Inspect or apply
+        required: true
+        default: inspect
+        type: choice
+        options:
+          - inspect
+          - apply
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python upgrade_food_group.py
+        env:
+          YANDEX_DIRECT_TOKEN: ${{ secrets.YANDEX_DIRECT_TOKEN }}
+          FOOD_UPGRADE_MODE: ${{ inputs.mode }}
