@@ -9,7 +9,7 @@ API = "https://api.direct.yandex.com/json/v501"
 CAMPAIGN_ID = 706863240
 GROUP_ID = 5826331360
 LANDING = "https://xn--80aeb4aacrhcscincn.xn--p1ai/pishchchekhly/"
-IMAGE_PATH = "assets/food-thermal-covers-ad.jpg"
+IMAGE_PATH = "assets/food-thermal-covers-ad-square.jpg"
 TITLES = [
     "Пищевые термочехлы от производителя",
     "Термочехлы для продуктов и логистики",
