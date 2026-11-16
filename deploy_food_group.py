@@ -117,11 +117,18 @@ old_keywords = call(
     "keywords", "get",
     {
         "SelectionCriteria": {"AdGroupIds": OLD_GROUP_IDS},
-        "FieldNames": ["Id", "AdGroupId", "State", "Status"],
+        "FieldNames": ["Id", "Keyword", "AdGroupId", "State", "Status"],
     },
 )["result"]["Keywords"]
-ids(call("ads", "suspend", {"SelectionCriteria": {"Ids": [row["Id"] for row in old_ads]}}), "SuspendResults")
-ids(call("keywords", "suspend", {"SelectionCriteria": {"Ids": [row["Id"] for row in old_keywords]}}), "SuspendResults")
+old_ad_ids = [row["Id"] for row in old_ads if row["State"] != "SUSPENDED"]
+old_keyword_ids = [
+    row["Id"] for row in old_keywords
+    if row["Keyword"] != "---autotargeting" and row["State"] != "SUSPENDED"
+]
+if old_ad_ids:
+    ids(call("ads", "suspend", {"SelectionCriteria": {"Ids": old_ad_ids}}), "SuspendResults")
+if old_keyword_ids:
+    ids(call("keywords", "suspend", {"SelectionCriteria": {"Ids": old_keyword_ids}}), "SuspendResults")
 
 group_id = ids(
     call(
