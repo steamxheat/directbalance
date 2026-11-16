@@ -79,3 +79,33 @@ for label, (service, params) in queries.items():
         result = {"exception": type(error).__name__, "message": str(error)}
     print(f"=== {label} ===")
     print(json.dumps(result, ensure_ascii=False, indent=2))
+
+campaign = call("campaigns", {
+    "SelectionCriteria": {"Ids": [CAMPAIGN_ID]},
+    "FieldNames": ["Id", "Name", "Status", "State"],
+})["result"]["Campaigns"][0]
+groups = call("adgroups", {
+    "SelectionCriteria": {"CampaignIds": [CAMPAIGN_ID]},
+    "FieldNames": ["Id", "Name", "Status", "ServingStatus"],
+})["result"]["AdGroups"]
+ads = call("ads", {
+    "SelectionCriteria": {"CampaignIds": [CAMPAIGN_ID]},
+    "FieldNames": ["Id", "AdGroupId", "Status", "State", "StatusClarification"],
+})["result"]["Ads"]
+keywords = call("keywords", {
+    "SelectionCriteria": {"CampaignIds": [CAMPAIGN_ID]},
+    "FieldNames": ["Id", "Keyword", "AdGroupId", "Status", "State", "ServingStatus"],
+})["result"]["Keywords"]
+
+summary = {"campaign": campaign, "groups": []}
+for group in groups:
+    group_ads = [row for row in ads if row["AdGroupId"] == group["Id"]]
+    group_keywords = [row for row in keywords if row["AdGroupId"] == group["Id"]]
+    summary["groups"].append({
+        **group,
+        "ads": [{key: row.get(key) for key in ("Id", "Status", "State", "StatusClarification")} for row in group_ads],
+        "keyword_states": {state: sum(row["State"] == state for row in group_keywords) for state in {row["State"] for row in group_keywords}},
+        "autotarget": [{key: row.get(key) for key in ("Id", "Status", "State", "ServingStatus")} for row in group_keywords if row["Keyword"] == "---autotargeting"],
+    })
+print("=== summary ===")
+print(json.dumps(summary, ensure_ascii=False, indent=2))
