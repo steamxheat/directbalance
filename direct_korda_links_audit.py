@@ -31,7 +31,7 @@ groups = call(
     "adgroups",
     {
         "SelectionCriteria": {"CampaignIds": [CAMPAIGN_ID]},
-        "FieldNames": ["Id", "Name", "Status", "State", "ServingStatus"],
+        "FieldNames": ["Id", "Name", "Status", "ServingStatus"],
     },
 )["AdGroups"]
 
