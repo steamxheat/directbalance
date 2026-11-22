@@ -1,8 +1,6 @@
 name: Direct balance
 
 on:
-  schedule:
-    - cron: "17 */8 * * *"
   workflow_dispatch:
 
 jobs:
