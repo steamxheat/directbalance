@@ -2,6 +2,7 @@
 import json
 import base64
 import io
+import zlib
 import os
 from pathlib import Path
 import urllib.request
@@ -88,7 +89,10 @@ def resolve(obj):
 
 
 def main():
-    calls = json.loads(os.environ.get('REQUESTS_JSON') or '[]')
+    raw = os.environ.get('REQUESTS_JSON') or '[]'
+    if raw.startswith('z:'):
+        raw = zlib.decompress(base64.b64decode(raw[2:])).decode()
+    calls = json.loads(raw)
     assert isinstance(calls, list) and len(calls) <= 25
     for call in calls:
         name, service, method = (call[k] for k in ['name', 'service', 'method'])
