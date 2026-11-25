@@ -68,7 +68,9 @@ def guard_update(params):
     ids = [a['Id'] for a in params['Ads']]
     for a in params['Ads']:
         assert set(a) == {'Id', 'ResponsiveAd'}
-        assert set(a['ResponsiveAd']).issubset({'SitelinkSetId', 'AdExtensionIds'})
+        assert set(a['ResponsiveAd']).issubset({'SitelinkSetId', 'CalloutSetting'})
+        if 'CalloutSetting' in a['ResponsiveAd']:
+            assert all(x['Operation'] == 'SET' for x in a['ResponsiveAd']['CalloutSetting']['AdExtensions'])
     rows = api('ads', 'get', {'SelectionCriteria': {'Ids': ids},
                               'FieldNames': ['Id', 'AdGroupId', 'State', 'Status']})['Ads']
     assert {a['Id'] for a in rows} == set(ids)
