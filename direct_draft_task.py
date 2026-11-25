@@ -15,8 +15,9 @@ ALLOWED = {'campaigns', 'adgroups', 'ads', 'keywords', 'sitelinks', 'adextension
 
 
 def api(service, method, params):
-    assert service in ALLOWED and method in {'get', 'add'}
+    assert service in ALLOWED and method in {'get', 'add', 'update'}
     assert service != 'businesses' or method == 'get'
+    assert method != 'update' or service == 'ads'
     req = urllib.request.Request(
         'https://api.direct.yandex.com/json/v501/' + service,
         data=json.dumps({'method': method, 'params': params}).encode(),
@@ -63,6 +64,21 @@ def guard(service, params):
         draft_campaigns([g['CampaignId'] for g in groups])
 
 
+def guard_update(params):
+    ids = [a['Id'] for a in params['Ads']]
+    for a in params['Ads']:
+        assert set(a) == {'Id', 'ResponsiveAd'}
+        assert set(a['ResponsiveAd']).issubset({'SitelinkSetId', 'AdExtensionIds'})
+    rows = api('ads', 'get', {'SelectionCriteria': {'Ids': ids},
+                              'FieldNames': ['Id', 'AdGroupId', 'State', 'Status']})['Ads']
+    assert {a['Id'] for a in rows} == set(ids)
+    assert all(a['Status'] == 'DRAFT' and a['State'] == 'OFF' for a in rows)
+    gids = sorted({a['AdGroupId'] for a in rows})
+    groups = api('adgroups', 'get', {'SelectionCriteria': {'Ids': gids},
+                                    'FieldNames': ['Id', 'CampaignId']})['AdGroups']
+    draft_campaigns([g['CampaignId'] for g in groups])
+
+
 def resolve(obj):
     if isinstance(obj, dict):
         if set(obj) == {'$image'}:
@@ -97,11 +113,15 @@ def main():
     for call in calls:
         name, service, method = (call[k] for k in ['name', 'service', 'method'])
         assert name.replace('-', '').replace('_', '').isalnum() and name not in RESULTS
-        assert service in ALLOWED and method in {'get', 'add'}
+        assert service in ALLOWED and method in {'get', 'add', 'update'}
         params = resolve(call['params'])
-        if method == 'add':
+        if method in {'add', 'update'}:
             assert os.environ.get('CREATE_DRAFT') == 'yes'
-            guard(service, params)
+            if method == 'add':
+                guard(service, params)
+            else:
+                assert service == 'ads'
+                guard_update(params)
         result = api(service, method, params)
         RESULTS[name] = result
         (OUT / (name + '.json')).write_text(json.dumps(result, ensure_ascii=False, indent=2))
