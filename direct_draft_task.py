@@ -1,5 +1,7 @@
 """Run bounded draft-only API requests; credentials stay in Actions secrets."""
 import json
+import base64
+import io
 import os
 from pathlib import Path
 import urllib.request
@@ -62,6 +64,17 @@ def guard(service, params):
 
 def resolve(obj):
     if isinstance(obj, dict):
+        if set(obj) == {'$image'}:
+            from PIL import Image
+            assert obj['$image'].startswith('https://')
+            with urllib.request.urlopen(obj['$image'], timeout=30) as response:
+                data = response.read(10_000_001)
+            assert len(data) <= 10_000_000
+            with Image.open(io.BytesIO(data)) as source:
+                assert source.width >= 450 and source.height >= 450
+                buf = io.BytesIO()
+                source.convert('RGB').save(buf, 'JPEG', quality=94)
+            return base64.b64encode(buf.getvalue()).decode()
         if set(obj) == {'$ref'}:
             parts = obj['$ref'].split('.')
             value = RESULTS[parts.pop(0)]
