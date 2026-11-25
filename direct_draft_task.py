@@ -8,11 +8,12 @@ import urllib.error
 OUT = Path('draft-output')
 OUT.mkdir(exist_ok=True)
 RESULTS = {}
-ALLOWED = {'campaigns', 'adgroups', 'ads', 'keywords', 'sitelinks', 'adextensions', 'adimages'}
+ALLOWED = {'campaigns', 'adgroups', 'ads', 'keywords', 'sitelinks', 'adextensions', 'adimages', 'businesses'}
 
 
 def api(service, method, params):
     assert service in ALLOWED and method in {'get', 'add'}
+    assert service != 'businesses' or method == 'get'
     req = urllib.request.Request(
         'https://api.direct.yandex.com/json/v501/' + service,
         data=json.dumps({'method': method, 'params': params}).encode(),
