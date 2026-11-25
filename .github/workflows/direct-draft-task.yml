@@ -1,0 +1,38 @@
+name: Direct draft preparation
+on:
+  push:
+    branches: [task/contract-draft-20261125]
+  workflow_dispatch:
+    inputs:
+      requests:
+        description: JSON request list
+        type: string
+        required: true
+        default: '[]'
+      create_draft:
+        type: choice
+        options: ['no', 'yes']
+        default: 'no'
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python direct_draft_task.py
+        env:
+          YANDEX_DIRECT_TOKEN: ${{ secrets.YANDEX_DIRECT_TOKEN }}
+          CLIENT_LOGIN: e-20086596
+          REQUESTS_JSON: ${{ inputs.requests }}
+          CREATE_DRAFT: ${{ inputs.create_draft }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: direct-draft-output
+          path: draft-output/
+          retention-days: 1
