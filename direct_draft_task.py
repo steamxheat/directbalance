@@ -41,6 +41,9 @@ def guard(service, params):
         assert len(params['Campaigns']) == 1
         c = params['Campaigns'][0]
         assert 'ЧЕРНОВИК' in c['Name']
+        existing = api('campaigns', 'get', {'SelectionCriteria': {}, 'FieldNames': ['Id', 'Name']})
+        assert 'LimitedBy' not in existing
+        assert not any(x['Name'] == c['Name'] for x in existing['Campaigns']), 'Draft already exists; read back before continuing'
         u = c['UnifiedCampaign']['BiddingStrategy']
         assert u['Network']['BiddingStrategyType'] == 'SERVING_OFF'
         assert u['Search']['BiddingStrategyType'] == 'WB_MAXIMUM_CLICKS'
