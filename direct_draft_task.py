@@ -21,7 +21,7 @@ def api(service, method, params):
     assert service in ALLOWED and method in {'get', 'add', 'update', 'delete'}
     assert service != 'businesses' or method == 'get'
     assert method != 'update' or service in {'ads', 'adgroups'}
-    assert method != 'delete' or (REVISION and service == 'keywords')
+    assert method != 'delete' or (REVISION and service in {'keywords', 'ads', 'adgroups'})
     req = urllib.request.Request(
         'https://api.direct.yandex.com/json/v501/' + service,
         data=json.dumps({'method': method, 'params': params}).encode(),
@@ -91,8 +91,45 @@ def guard_update(params):
     draft_campaigns([g['CampaignId'] for g in groups])
 
 
-def guard_revision(service, method, params):
+def guard_merged_draft_delete(service, params):
+    draft_campaigns([REVISION_CAMPAIGN])
+    criteria = {'CampaignIds': [REVISION_CAMPAIGN]}
+    groups = api('adgroups', 'get', {'SelectionCriteria': criteria,
+                                   'FieldNames': ['Id', 'Name', 'Status']})['AdGroups']
+    retired = {g['Id'] for g in groups if g['Name'].startswith(('04 | Каркасы ', '05 | Сварная балка'))}
+    target, = [g['Id'] for g in groups if g['Name'] == '02 | Крупногабаритные сварные конструкции']
+    assert retired and all(g['Status'] == 'DRAFT' for g in groups if g['Id'] in retired | {target})
+    ids = set(params['SelectionCriteria']['Ids'])
+    assert ids
+    ads = api('ads', 'get', {'SelectionCriteria': criteria,
+                            'FieldNames': ['Id', 'AdGroupId', 'Status', 'State'],
+                            'ResponsiveAdFieldNames': ['Titles', 'Texts', 'Href', 'DisplayUrlPath',
+                                                       'AdImages', 'SitelinkSetId', 'AdExtensions', 'BusinessId']})['Ads']
+    keywords = api('keywords', 'get', {'SelectionCriteria': criteria,
+                                      'FieldNames': ['Id', 'AdGroupId', 'Keyword']})['Keywords']
+    active_keys = {k['Keyword'] for k in keywords if k['AdGroupId'] == target}
+    assert len(active_keys) == 31
+    assert len([a for a in ads if a['AdGroupId'] == target]) == 9
+    assert all(a['Status'] == 'DRAFT' and a['State'] == 'OFF' for a in ads)
+    if service == 'ads':
+        live = [a for a in ads if a['Id'] in ids]
+        copies = [a['ResponsiveAd'] for a in ads if a['AdGroupId'] == target]
+        assert {a['Id'] for a in live} == ids
+        assert all(a['AdGroupId'] in retired and a['ResponsiveAd'] in copies for a in live)
+    elif service == 'keywords':
+        live = [k for k in keywords if k['Id'] in ids]
+        assert {k['Id'] for k in live} == ids
+        assert all(k['AdGroupId'] in retired and k['Keyword'] in active_keys for k in live)
+    else:
+        assert service == 'adgroups' and ids <= retired
+        assert not any(row['AdGroupId'] in ids for row in ads + keywords)
+
+
+def guard_revision(service, method, params, name):
     assert REVISION
+    if method == 'delete' and name.startswith('merge-retire-'):
+        guard_merged_draft_delete(service, params)
+        return
     if (service, method) == ('adgroups', 'update'):
         assert all(set(group) <= {'Id', 'Name', 'NegativeKeywords'} for group in params['AdGroups'])
         ids = {group['Id'] for group in params['AdGroups']}
@@ -157,15 +194,15 @@ def main():
         assert name.replace('-', '').replace('_', '').isalnum() and name not in RESULTS
         assert service in ALLOWED and method in {'get', 'add', 'update', 'delete'}
         params = resolve(call['params'])
-        if method in {'add', 'update', 'delete'}:
-            assert os.environ.get('CREATE_DRAFT') == 'yes'
-            if method == 'add':
-                guard(service, params)
-            elif (service, method) == ('ads', 'update'):
-                guard_update(params)
-            else:
-                guard_revision(service, method, params)
         try:
+            if method in {'add', 'update', 'delete'}:
+                assert os.environ.get('CREATE_DRAFT') == 'yes'
+                if method == 'add':
+                    guard(service, params)
+                elif (service, method) == ('ads', 'update'):
+                    guard_update(params)
+                else:
+                    guard_revision(service, method, params, name)
             result = api(service, method, params)
         except RuntimeError as error:
             if not REVISION:
