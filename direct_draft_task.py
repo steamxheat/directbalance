@@ -125,7 +125,9 @@ def guard_merged_draft_delete(service, params):
         assert all(k['AdGroupId'] in retired and k['Keyword'] in active_keys for k in live)
     else:
         assert service == 'adgroups' and ids <= retired
-        assert not any(row['AdGroupId'] in ids for row in ads + keywords)
+        assert not any(row['AdGroupId'] in ids for row in ads)
+        # Unified drafts may report a synthetic autotargeting row even without explicit criteria.
+        assert not any(k['AdGroupId'] in ids and k['Keyword'] != '---autotargeting' for k in keywords)
 
 
 def guard_revision(service, method, params, name):
