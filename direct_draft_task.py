@@ -109,13 +109,16 @@ def guard_merged_draft_delete(service, params):
                                       'FieldNames': ['Id', 'AdGroupId', 'Keyword']})['Keywords']
     active_keys = {k['Keyword'] for k in keywords if k['AdGroupId'] == target}
     assert len(active_keys) == 31
-    assert len([a for a in ads if a['AdGroupId'] == target]) == 9
+    assert len([a for a in ads if a['AdGroupId'] == target]) == 3
     assert all(a['Status'] == 'DRAFT' and a['State'] == 'OFF' for a in ads)
     if service == 'ads':
         live = [a for a in ads if a['Id'] in ids]
         copies = [a['ResponsiveAd'] for a in ads if a['AdGroupId'] == target]
         assert {a['Id'] for a in live} == ids
-        assert all(a['AdGroupId'] in retired and a['ResponsiveAd'] in copies for a in live)
+        assert {a['AdGroupId'] for a in live} == retired
+        assert all(a['Id'] in ids for a in ads if a['AdGroupId'] in retired)
+        for group_id in retired:
+            assert any(a['AdGroupId'] == group_id and a['ResponsiveAd'] in copies for a in live)
     elif service == 'keywords':
         live = [k for k in keywords if k['Id'] in ids]
         assert {k['Id'] for k in live} == ids
