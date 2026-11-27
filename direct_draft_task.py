@@ -69,7 +69,7 @@ def guard(service, method, params):
         targets = [row for row in saved if row['AdGroupId'] == GROUP and row['State'] == 'ON']
         assert {row['Id'] for row in targets} == AD_IDS
         assert all(row['CampaignId'] == CAMPAIGN and row['Type'] == 'RESPONSIVE_AD' for row in targets)
-        assert all(not row['ResponsiveAd'].get('AdImages', {}).get('Items') for row in targets)
+        assert all(not (row['ResponsiveAd'].get('AdImages') or {}).get('Items') for row in targets)
         return
     assert service == 'campaigns' and method in {'suspend', 'archive'}
     assert params == {'SelectionCriteria': {'Ids': [OLD_CAMPAIGN]}}
