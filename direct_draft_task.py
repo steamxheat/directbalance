@@ -96,7 +96,7 @@ def crypt(data, decrypt=False):
 def resolve(obj):
     if isinstance(obj, dict):
         if set(obj) == {'$image'}:
-            from PIL import Image
+            from PIL import Image, ImageOps
             assert obj['$image'].startswith('https://')
             with urllib.request.urlopen(obj['$image'], timeout=30) as response:
                 data = response.read(10_000_001)
@@ -104,7 +104,7 @@ def resolve(obj):
             with Image.open(io.BytesIO(data)) as source:
                 assert source.width >= 450 and source.height >= 450
                 buf = io.BytesIO()
-                source.convert('RGB').save(buf, 'JPEG', quality=94)
+                ImageOps.fit(source.convert('RGB'), (1200, 900)).save(buf, 'JPEG', quality=94)
             return base64.b64encode(buf.getvalue()).decode()
         if set(obj) == {'$ref'}:
             parts = obj['$ref'].split('.')
