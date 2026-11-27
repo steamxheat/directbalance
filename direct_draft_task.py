@@ -18,9 +18,10 @@ ALLOWED = {'campaigns', 'adgroups', 'ads', 'keywords', 'sitelinks', 'adextension
 
 
 def api(service, method, params):
-    assert service in ALLOWED and method in {'get', 'add', 'update', 'delete'}
+    assert service in ALLOWED and method in {'get', 'add', 'update', 'delete', 'suspend', 'archive'}
     assert service != 'businesses' or method == 'get'
     assert method != 'update' or service in {'ads', 'adgroups'}
+    assert method not in {'suspend', 'archive'} or service == 'campaigns'
     assert method != 'delete' or (REVISION and service in {'keywords', 'ads', 'adgroups'})
     req = urllib.request.Request(
         'https://api.direct.yandex.com/json/v501/' + service,
@@ -38,120 +39,51 @@ def api(service, method, params):
     return value['result']
 
 
-def draft_campaigns(ids):
-    assert not REVISION or set(ids) == {REVISION_CAMPAIGN}
-    rows = api('campaigns', 'get', {'SelectionCriteria': {'Ids': sorted(set(ids))},
-                                   'FieldNames': ['Id', 'Name', 'State', 'Status']})['Campaigns']
-    assert {r['Id'] for r in rows} == set(ids)
-    assert all(r['Status'] == 'DRAFT' and r['State'] in {'OFF', 'SUSPENDED'} for r in rows), rows
+OLD_CAMPAIGN = 714161295
+CAMPAIGN = 716746993
+GROUP = 5832499730
+LAVITA_GROUPS = {5795900522, 5832497754}
+PHOTO_NAMES = ('pipeline-hero', 'tanks-hero', 'equipment-hero', 'small-hero', 'roof-hero', 'surface-hero')
+AD_IDS = {1928111137801195208, 1928112004311784995, 1928112156782184504}
+PHOTO_URLS = {f'https://korda.su/assets/industrial/{name}.webp' for name in PHOTO_NAMES}
 
 
-def guard(service, params):
-    if REVISION:
-        assert service in {'adgroups', 'ads', 'keywords', 'adextensions', 'sitelinks'}
-    if service == 'campaigns':
-        assert len(params['Campaigns']) == 1
-        c = params['Campaigns'][0]
-        assert 'ЧЕРНОВИК' in c['Name']
-        existing = api('campaigns', 'get', {'SelectionCriteria': {}, 'FieldNames': ['Id', 'Name']})
-        assert 'LimitedBy' not in existing
-        assert not any(x['Name'] == c['Name'] for x in existing['Campaigns']), 'Draft already exists; read back before continuing'
-        u = c['UnifiedCampaign']['BiddingStrategy']
-        assert u['Network']['BiddingStrategyType'] == 'SERVING_OFF'
-        assert u['Search']['BiddingStrategyType'] == 'WB_MAXIMUM_CLICKS'
-        assert u['Search']['WbMaximumClicks']['WeeklySpendLimit'] == 10_000_000_000
-    elif service == 'adgroups':
-        draft_campaigns([g['CampaignId'] for g in params['AdGroups']])
-    elif service in {'ads', 'keywords'}:
-        key = 'Ads' if service == 'ads' else 'Keywords'
-        ids = sorted({a['AdGroupId'] for a in params[key]})
-        groups = api('adgroups', 'get', {'SelectionCriteria': {'Ids': ids},
-                                       'FieldNames': ['Id', 'CampaignId']})['AdGroups']
-        assert {g['Id'] for g in groups} == set(ids)
-        draft_campaigns([g['CampaignId'] for g in groups])
-
-
-def guard_update(params):
-    ids = [a['Id'] for a in params['Ads']]
-    for a in params['Ads']:
-        assert set(a) == {'Id', 'ResponsiveAd'}
-        fields = {'SitelinkSetId', 'CalloutSetting'}
-        if REVISION:
-            fields |= {'Titles', 'Texts', 'Href', 'DisplayUrlPath', 'AdImageHashes'}
-        assert set(a['ResponsiveAd']).issubset(fields)
-        if 'CalloutSetting' in a['ResponsiveAd']:
-            assert all(x['Operation'] == 'SET' for x in a['ResponsiveAd']['CalloutSetting']['AdExtensions'])
-    rows = api('ads', 'get', {'SelectionCriteria': {'Ids': ids},
-                              'FieldNames': ['Id', 'AdGroupId', 'State', 'Status']})['Ads']
-    assert {a['Id'] for a in rows} == set(ids)
-    assert all(a['Status'] == 'DRAFT' and a['State'] == 'OFF' for a in rows)
-    gids = sorted({a['AdGroupId'] for a in rows})
-    groups = api('adgroups', 'get', {'SelectionCriteria': {'Ids': gids},
-                                    'FieldNames': ['Id', 'CampaignId']})['AdGroups']
-    draft_campaigns([g['CampaignId'] for g in groups])
-
-
-def guard_merged_draft_delete(service, params):
-    draft_campaigns([REVISION_CAMPAIGN])
-    criteria = {'CampaignIds': [REVISION_CAMPAIGN]}
-    groups = api('adgroups', 'get', {'SelectionCriteria': criteria,
-                                   'FieldNames': ['Id', 'Name', 'Status']})['AdGroups']
-    retired = {g['Id'] for g in groups if g['Name'].startswith(('04 | Каркасы ', '05 | Сварная балка'))}
-    target, = [g['Id'] for g in groups if g['Name'] == '02 | Крупногабаритные сварные конструкции']
-    assert retired and all(g['Status'] == 'DRAFT' for g in groups if g['Id'] in retired | {target})
-    ids = set(params['SelectionCriteria']['Ids'])
-    assert ids
-    ads = api('ads', 'get', {'SelectionCriteria': criteria,
-                            'FieldNames': ['Id', 'AdGroupId', 'Status', 'State'],
-                            'ResponsiveAdFieldNames': ['Titles', 'Texts', 'Href', 'DisplayUrlPath',
-                                                       'AdImages', 'SitelinkSetId', 'AdExtensions', 'BusinessId']})['Ads']
-    keywords = api('keywords', 'get', {'SelectionCriteria': criteria,
-                                      'FieldNames': ['Id', 'AdGroupId', 'Keyword']})['Keywords']
-    active_keys = {k['Keyword'] for k in keywords if k['AdGroupId'] == target}
-    assert len(active_keys) == 31
-    assert len([a for a in ads if a['AdGroupId'] == target]) == 3
-    assert all(a['Status'] == 'DRAFT' and a['State'] == 'OFF' for a in ads)
-    if service == 'ads':
-        live = [a for a in ads if a['Id'] in ids]
-        copies = [a['ResponsiveAd'] for a in ads if a['AdGroupId'] == target]
-        assert {a['Id'] for a in live} == ids
-        assert {a['AdGroupId'] for a in live} == retired
-        assert all(a['Id'] in ids for a in ads if a['AdGroupId'] in retired)
-        for group_id in retired:
-            assert any(a['AdGroupId'] == group_id and a['ResponsiveAd'] in copies for a in live)
-    elif service == 'keywords':
-        live = [k for k in keywords if k['Id'] in ids]
-        assert {k['Id'] for k in live} == ids
-        assert all(k['AdGroupId'] in retired and k['Keyword'] in active_keys for k in live)
-    else:
-        assert service == 'adgroups' and ids <= retired
-        assert not any(row['AdGroupId'] in ids for row in ads)
-        # Unified drafts may report a synthetic autotargeting row even without explicit criteria.
-        assert not any(k['AdGroupId'] in ids and k['Keyword'] != '---autotargeting' for k in keywords)
-
-
-def guard_revision(service, method, params, name):
+def guard(service, method, params):
     assert REVISION
-    if method == 'delete' and name.startswith('merge-retire-'):
-        guard_merged_draft_delete(service, params)
+    if (service, method) == ('adimages', 'add'):
+        items = params['AdImages']
+        assert len(items) == 6
+        assert {item['ImageData']['$image'] for item in items} == PHOTO_URLS
+        assert all(item['Type'] == 'REGULAR' for item in items)
         return
-    if (service, method) == ('adgroups', 'update'):
-        assert all(set(group) <= {'Id', 'Name', 'NegativeKeywords'} for group in params['AdGroups'])
-        ids = {group['Id'] for group in params['AdGroups']}
-    else:
-        assert (service, method) == ('keywords', 'delete')
-        keyword_ids = set(params['SelectionCriteria']['Ids'])
-        criteria = {'Ids': sorted(keyword_ids), 'CampaignIds': [REVISION_CAMPAIGN]}
-        keywords = api('keywords', 'get', {'SelectionCriteria': criteria,
-                                           'FieldNames': ['Id', 'AdGroupId', 'Keyword', 'State']})['Keywords']
-        assert {k['Id'] for k in keywords} == keyword_ids
-        assert all(k['Keyword'] != '---autotargeting' for k in keywords)
-        ids = {k['AdGroupId'] for k in keywords}
-    groups = api('adgroups', 'get', {'SelectionCriteria': {'Ids': sorted(ids)},
-                                    'FieldNames': ['Id', 'CampaignId', 'Status']})['AdGroups']
-    assert ids and {g['Id'] for g in groups} == ids
-    assert all(g['Status'] == 'DRAFT' for g in groups)
-    draft_campaigns([g['CampaignId'] for g in groups])
+    if (service, method) == ('ads', 'update'):
+        rows = params['Ads']
+        assert len(rows) == 3 and {row['Id'] for row in rows} == AD_IDS
+        for row in rows:
+            assert set(row) == {'Id', 'ResponsiveAd'}
+            assert set(row['ResponsiveAd']) == {'AdImageHashes'}
+            assert len(row['ResponsiveAd']['AdImageHashes']['Items']) == 2
+        saved = api('ads', 'get', {'SelectionCriteria': {'CampaignIds': [CAMPAIGN]},
+                                  'FieldNames': ['Id', 'AdGroupId', 'CampaignId', 'Type', 'State'],
+                                  'ResponsiveAdFieldNames': ['AdImages']})['Ads']
+        targets = [row for row in saved if row['AdGroupId'] == GROUP and row['State'] == 'ON']
+        assert {row['Id'] for row in targets} == AD_IDS
+        assert all(row['CampaignId'] == CAMPAIGN and row['Type'] == 'RESPONSIVE_AD' for row in targets)
+        assert all(not row['ResponsiveAd'].get('AdImages', {}).get('Items') for row in targets)
+        return
+    assert service == 'campaigns' and method in {'suspend', 'archive'}
+    assert params == {'SelectionCriteria': {'Ids': [OLD_CAMPAIGN]}}
+    campaigns = api('campaigns', 'get', {'SelectionCriteria': {'Ids': [OLD_CAMPAIGN, CAMPAIGN]},
+                                         'FieldNames': ['Id', 'Name', 'State']})['Campaigns']
+    states = {row['Id']: row['State'] for row in campaigns}
+    assert states.get(CAMPAIGN) == 'ON'
+    assert states.get(OLD_CAMPAIGN) in ({'ON'} if method == 'suspend' else {'SUSPENDED', 'OFF'})
+    if method == 'suspend':
+        ads = api('ads', 'get', {'SelectionCriteria': {'CampaignIds': [OLD_CAMPAIGN, CAMPAIGN]},
+                                'FieldNames': ['Id', 'AdGroupId', 'CampaignId', 'State']})['Ads']
+        assert {row['AdGroupId'] for row in ads
+                if row['CampaignId'] == OLD_CAMPAIGN and row['State'] == 'ON'} == {5795900522}
+        assert {row['AdGroupId'] for row in ads if row['AdGroupId'] in LAVITA_GROUPS and row['State'] == 'ON'} == LAVITA_GROUPS
 
 
 def crypt(data, decrypt=False):
@@ -197,17 +129,12 @@ def main():
     for call in calls:
         name, service, method = (call[k] for k in ['name', 'service', 'method'])
         assert name.replace('-', '').replace('_', '').isalnum() and name not in RESULTS
-        assert service in ALLOWED and method in {'get', 'add', 'update', 'delete'}
-        params = resolve(call['params'])
+        assert service in ALLOWED and method in {'get', 'add', 'update', 'delete', 'suspend', 'archive'}
         try:
-            if method in {'add', 'update', 'delete'}:
+            if method != 'get':
                 assert os.environ.get('CREATE_DRAFT') == 'yes'
-                if method == 'add':
-                    guard(service, params)
-                elif (service, method) == ('ads', 'update'):
-                    guard_update(params)
-                else:
-                    guard_revision(service, method, params, name)
+                guard(service, method, call['params'] if service == 'adimages' else resolve(call['params']))
+            params = resolve(call['params'])
             result = api(service, method, params)
         except RuntimeError as error:
             if not REVISION:
@@ -221,8 +148,6 @@ def main():
                   for r in rows if r.get('Errors')]
         assert not errors, f'{name}: {len(errors)} per-item failures; see artifact' if REVISION else errors
         assert 'LimitedBy' not in result, 'Paginated response requires explicit continuation'
-        if service == 'campaigns' and method == 'add':
-            draft_campaigns([r['Id'] for r in result['AddResults']])
         print('OK', name, service, method, {k: len(v) for k, v in result.items() if isinstance(v, list)})
 
 

@@ -1,7 +1,5 @@
 name: Direct draft preparation
 on:
-  push:
-    branches: [task/contract-draft-20261125]
   workflow_dispatch:
     inputs:
       requests:
